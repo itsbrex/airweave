@@ -6,7 +6,11 @@ Graph permission model:
 - grantedToV2.user → user:{email}
 - grantedToV2.group (Entra ID) → group:entra:{group_id}
 - grantedToV2.siteGroup → group:sp:{site_group_name}
-- link with scope "organization" → is_public (org-wide access)
+- link with scope "anonymous" → is_public (true tenant-wide / internet-wide access)
+
+Organization-scoped sharing links ("anyone in your org with the link") are NOT
+treated as public. Possession of the link URL is required, so the audience is
+captured via the per-link SharingLinks.* SP site group rather than is_public.
 """
 
 from typing import Any, Dict, List, Optional
@@ -76,14 +80,6 @@ def has_read_permission(permission: Dict[str, Any]) -> bool:
     return any(r in ("read", "write", "owner", "sp.full control") for r in roles)
 
 
-def is_org_wide_link(permission: Dict[str, Any]) -> bool:
-    """Check if a permission is an organization-wide sharing link."""
-    link = permission.get("link")
-    if not link:
-        return False
-    return link.get("scope", "") == "organization"
-
-
 def is_anonymous_link(permission: Dict[str, Any]) -> bool:
     """Check if a permission is an anonymous sharing link."""
     link = permission.get("link")
@@ -122,7 +118,7 @@ async def extract_access_control(
         if not has_read_permission(perm):
             continue
 
-        if is_org_wide_link(perm) or is_anonymous_link(perm):
+        if is_anonymous_link(perm):
             is_public = True
             continue
 
